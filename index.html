@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <title>캐릭터 정보</title>
+    <style>
+        * {
+            text-decoration: none;
+        }
+        :root {
+            --rounded-corner-circle: 9999px;
+            --rounded-corner-large: 16px;
+            --rounded-corner-normal: 8px;
+            --rounded-corner-small: 4px;
+            --rounded-corner-none: 0px;
+
+            --default-color: #000;
+            --border-color-dark: #231815;
+            --border-color-mid: #999999;
+            --border-color-light: #cfcfcf;
+            --baseLine-color: #ff0000;
+
+            --border-thick: 2px;
+            --border-normal: 0.5px;
+            --border-light: 0.5px;
+
+            --point-size: 10px;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #d9d9d9;
+            z-index: 0;
+        }
+        .title {
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+        }
+        #chart {
+            box-sizing: border-box;
+            width: calc(100% - 60px);
+            height: calc(100% - 60px);
+            border: 1px solid var(--default-color);
+            overflow-y: auto;
+            padding: 60px;
+            border-radius: var(--rounded-corner-large);
+        }
+        #chart-content {
+            border-left: 2px solid var(--baseLine-color);
+            border-bottom: 2px solid var(--baseLine-color);
+            margin-left: -2px;
+            margin-bottom: -2px;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .password-modal {
+            display: flex;
+            text-align: center;
+            box-sizing: border-box;
+            max-width: 400px;
+            max-height: 250px;
+            align-items: center;
+            border: 1px solid var(--border-color-mid);
+            border-radius: var(--rounded-corner-large);
+            padding: 40px 30px;
+            background-color: white;
+            flex-direction: column;
+        }
+        input:focus-visible {
+            outline: none;
+        }
+        #input-box {
+            margin-top: 10px;
+            height: 20px;
+            width: 200px;
+            padding: 10px;
+            border-radius: var(--rounded-corner-normal);
+            border: 1px solid var(--border-color-mid);
+
+        }
+        .line, .char-node, .line-label, .text-box {
+            position: absolute;
+        }
+        .horizontal {
+            left: 0;
+            width: 100%;
+        }
+        .vertical {
+            bottom: 0;
+            height: 100%;
+        }
+        .line-label {
+            z-index: 3;
+            font-size: 1em;
+            font-weight: bold;
+        }
+        .thick {
+            background-color: var(--border-color-dark);
+            z-index: 3;
+        }
+        .medium {
+            background-color: var(--border-color-mid);
+            z-index: 2;
+        }
+        .light {
+            background-color: var(--border-color-light);
+            z-index: 1;
+        }
+        .horizontal.thick {
+            height: var(--border-thick);
+        }
+        .vertical.thick {
+            width: calc(var(--border-thick) * 0.5);
+        }
+        .horizontal.medium {
+            height: var(--border-normal);
+        }
+        .vertical.medium {
+            width: var(--border-normal);
+        }
+        .horizontal.light {
+            height: var(--border-light);
+        }
+        .vertical.light {
+            width: var(--border-light);
+        }
+        .char-node {
+            display: flex;
+            z-index: 4;
+            transform: translate(calc(-50% + 0.5px), calc(50% - 0.5px));
+        }
+        .dot {
+            box-sizing: border-box;
+            border-radius: var(--rounded-corner-circle);
+            width: var(--point-size);
+            height: var(--point-size);
+        }
+        .text-box {
+            left: 13px;
+            bottom: -5.8px;
+            width: fit-content;
+            white-space: nowrap;
+            z-index: 5;
+            font-size: 1.05em;
+        }
+    </style>
+</head>
+<body>
+    <div class="password-modal">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#1f1f1f"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></svg>
+        <form id="password">
+            <input id="input-box" type="password" placeholder="비밀번호 입력" maxlength="8" value="">
+            <button type="submit" style="display: none"></button>
+        </form>
+    </div>
+<script>
+    const chart=document.createElement("div");chart.id="chart";const chartContent=document.createElement("div");chartContent.id="chart-content";const characterNodes=document.createElement("div");characterNodes.className="node-container";const getRange=(e,t)=>{let a=e.map(e=>parseFloat(e[t])).filter(e=>Number.isFinite(e)&&e>0);return 0===a.length?{min:0,max:0}:{min:10*Math.trunc(.1*Math.min(...a))-10,max:10*Math.trunc(.1*Math.max(...a))+10}},normalize=(e,t,a)=>(e-t)/(a-t);function addLines(e,t,a,n){let i=document.createElement("div");i.className=`line-container ${n}`;let l=document.createElement("div");l.classList.add("line-label"),l.style.position="absolute",l.style.zIndex="3",l.textContent=`${e}${a}`,"horizontal"===n?(l.style.left="-44px",l.style.bottom="0px"):(l.style.left="0px",l.style.bottom="-20px"),i.appendChild(l);for(let d=e+1;d<t;d+=1){let r=100*normalize(d,e,t),c=document.createElement("div");if(c.classList.add("line",`${n}`),"horizontal"===n?c.style.bottom=`${r}%`:c.style.left=`${r}%`,d%100==0){c.classList.add("thick");let o=document.createElement("div");o.classList.add("line-label"),o.textContent=`${d}${a}`,"horizontal"===n?(o.style.left="-53px",o.style.bottom=`${r}%`):(o.style.left=`${r+.15}%`,o.style.bottom="-20px"),i.appendChild(o)}else d%10==0?c.classList.add("medium"):c.classList.add("light");i.appendChild(c)}chartContent.appendChild(i)}function addCharacter(e,t,a,n,i){let l=100*normalize(parseFloat(e.weight),n,i),d=100*normalize(parseFloat(e.height),t,a);if(!(Number.isFinite(l)&&Number.isFinite(d)))return;let r=document.createElement("div");r.className="char-node",r.style.left=`${l}%`,r.style.bottom=`${d}%`;let c=document.createElement("div");c.className="dot",c.style.background=`color-mix(in srgb, ${e.inner} 50%, transparent)`,c.style.border=`2px solid ${e.outer}`,JSON.stringify();let o=document.createElement("div");o.className="text-box";let s=document.createElement("div");s.className="char-display-name",o.textContent=e.displayName,o.appendChild(s),r.appendChild(c),r.appendChild(o),characterNodes.appendChild(r),chartContent.appendChild(characterNodes)}function createChart(e){document.body.innerHTML="",chart.appendChild(chartContent),document.body.appendChild(chart);let{min:t,max:a}=getRange(e,"height"),{min:n,max:i}=getRange(e,"weight");addLines(t,a,"cm","horizontal"),addLines(n,i,"kg","vertical"),e.forEach(e=>{addCharacter(e,t,a,n,i)})}function createChart(e){document.body.innerHTML="",chart.appendChild(chartContent),document.body.appendChild(chart);let{min:t,max:a}=getRange(e,"height"),{min:n,max:i}=getRange(e,"weight");addLines(t,a,"cm","horizontal"),addLines(n,i,"kg","vertical"),e.forEach(e=>{addCharacter(e,t,a,n,i)})}const form=document.getElementById("password");form.addEventListener("submit",async function(e){e.preventDefault();let t=document.getElementById("input-box"),a=t.value;try{let n=await fetch("data.enc");if(!n.ok)throw Error();let i=await n.text(),l=CryptoJS.AES.decrypt(i,a),d=l.toString(CryptoJS.enc.Utf8);if(d){let r=JSON.parse(d);createChart(r)}}catch(c){}});
+</script>
+</body>
+</html>
